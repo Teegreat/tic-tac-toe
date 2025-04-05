@@ -45,6 +45,7 @@ const Game = (function () {
   let players = [];
   let currentPlayerIndex = 0;
   let gameOver = false;
+  let gameStarted = false;
 
   const winningCombos = [
     // rows
@@ -119,49 +120,115 @@ const Game = (function () {
       players = [Player(player1Name, "X"), Player(player2Name, "O")];
       currentPlayerIndex = 0;
       gameOver = false;
+      gameStarted = true;
       Gameboard.resetBoard();
-      console.log(
-        `Welcome to Tic Tac Toe! ${players[0].getName()} will play as X, and ${players[1].getName()} will play as O.`
-      );
     },
     playTurn: (row, col) => {
-      if (gameOver) {
-        console.log("Game over! Please start a new game");
-        return;
-      }
+      if (!gameStarted || gameOver) return { status: "invalid" };
 
       const currentPlayer = players[currentPlayerIndex];
 
       if (Gameboard.placeMark(row, col, currentPlayer.getMark())) {
-        currentPlayer.getMark();
-        console.log(
-          `${currentPlayer.getName()} placed ${currentPlayer.getMark()} at (${row}, ${col})`
-        );
-        console.log(Gameboard.getBoard());
-
         const winner = checkWin();
-
         if (winner) {
-          console.log(`${currentPlayer.getName()} wins!`);
           gameOver = true;
+          return { status: "win", player: currentPlayer.getName() };
         } else if (checkTie()) {
-          console.log("It's a tie!");
           gameOver = true;
+          return { status: "tie" };
         } else {
           currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
-          console.log(`Next turn: ${players[currentPlayerIndex].getName()}`);
+          return { status: "continue" };
         }
       } else {
-        console.log("Invalid move! Try again.");
+        return { status: "invalid" };
       }
     },
+    getCurrentPlayer: () => players[currentPlayerIndex],
+    getPlayers: () => players,
+    getCurrentPlayerIndex: () => currentPlayerIndex,
+    isGameOver: () => gameOver,
+    isGameStarted: () => gameStarted,
+    checkWin,
+    checkTie,
   };
 })();
 
 // 4. Console-based game first
-Game.startGame("Alice", "Bob");
-console.log(Game.playTurn(0, 0));
-console.log(Game.playTurn(1, 1));
-console.log(Game.playTurn(0, 1));
-console.log(Game.playTurn(2, 2));
-console.log(Game.playTurn(0, 2));
+// Game.startGame("Alice", "Bob");
+// console.log(Game.playTurn(0, 0));
+// console.log(Game.playTurn(1, 1));
+// console.log(Game.playTurn(0, 1));
+// console.log(Game.playTurn(2, 2));
+// console.log(Game.playTurn(0, 2));
+
+// Display Controller  (IIFE)
+const DisplayController = (function () {
+  const boardDiv = document.getElementById("gameboard");
+  const resultDiv = document.getElementById("result");
+
+  const renderBoard = () => {
+    boardDiv.innerHTML = "";
+    const board = Gameboard.getBoard();
+    board.forEach((row, rowIndex) => {
+      row.forEach((cell, colIndex) => {
+        const cellDiv = document.createElement("div");
+        cellDiv.classList.add("cell");
+        cellDiv.textContent = cell || "";
+        cellDiv.addEventListener("click", () => {
+          if (!Game.isGameStarted()) {
+            resultDiv.textContent = "Please start the game first";
+            return;
+          }
+          if (!Game.isGameOver()) {
+            const result = Game.playTurn(rowIndex, colIndex);
+            renderBoard();
+            if (result.status === "win") {
+              resultDiv.textContent = `${result.player} wins!`;
+            } else if (result.status === "tie") {
+              resultDiv.textContent = "It's a tie!";
+            }
+          }
+        });
+        boardDiv.appendChild(cellDiv);
+      });
+    });
+  };
+
+  return {
+    init: () => {
+      const validatePlayers = () => {
+        const player1Name = document.getElementById("player1").value.trim();
+        const player2Name = document.getElementById("player2").value.trim();
+        if (!player1Name || !player2Name) {
+          resultDiv.textContent = "Please enter both players names";
+          return false;
+        }
+        return true;
+      };
+      document.getElementById("start-game").addEventListener("click", () => {
+        if (!validatePlayers()) return;
+        const player1 = document.getElementById("player1").value;
+        const player2 = document.getElementById("player2").value;
+        Game.startGame(player1, player2);
+        renderBoard();
+        resultDiv.textContent = "";
+      });
+
+      document.getElementById("reset-game").addEventListener("click", () => {
+        if (!validatePlayers()) return;
+        Gameboard.resetBoard();
+        Game.startGame(
+          document.getElementById("player1").value,
+          document.getElementById("player2").value
+        );
+        renderBoard();
+        resultDiv.textContent = "";
+      });
+
+      renderBoard();
+    },
+  };
+})();
+
+DisplayController.init();
